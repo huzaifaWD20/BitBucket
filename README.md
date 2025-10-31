@@ -6,9 +6,9 @@ A full-stack application that allows users to create custom t-shirts with tweet 
 
 ```
 tweet-shirt-app/
-├── backend/          # Node.js/Express server
-├── frontend/         # React application
-└── liquid/           # Shopify liquid templates
+├── backend/            # Node.js/Express server
+├── docs/screenshots    #Snapshots of API fetch and Interface for testing
+└── frontend/           # React application
 ```
 
 ## Prerequisites
