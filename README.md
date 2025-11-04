@@ -106,20 +106,21 @@ Key features:
 ## 6. Environment Variables (.env.example)
 
 ```env
+# Server Configuration
 PORT=3001
 NODE_ENV=development
 
 # Twitter API
 VXTWITTER_API=https://api.vxtwitter.com
-VXTWITTER_API_KEY=
 
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
+# Cloudinary Configuration
+CLOUDINARY_CLOUD_NAME=placeholder
+CLOUDINARY_API_KEY=placeholder
+CLOUDINARY_API_SECRET=placeholder
 
-# Printful
-PRINTFUL_API_KEY=
+# Printful Configuration
+PRINTFUL_API_KEY=placeholder
+PRINTFUL_STORE_ID=placeholder
 ```
 
 > **Note:** Keep your `.env` out of version control.
