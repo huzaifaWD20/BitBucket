@@ -13,6 +13,9 @@ export default function App() {
   const canvasRef = useRef(null);
   const fabricRef = useRef(null);
   const [fabricLoaded, setFabricLoaded] = useState(false);
+  const [mockupImage, setMockupImage] = useState(null);
+  const [printFile, setPrintFile] = useState(null);  // ADD THIS
+
 
   const colors = {
     white: { name: 'White', image: '/white-tshirt.jpg', hex: '#FFFFFF' },
@@ -139,6 +142,82 @@ export default function App() {
     return match ? match[1] : null;
   };
 
+  // const handleGeneratePreview = async () => {
+  //   if (!tweetUrl.trim()) {
+  //     setError('Please enter a tweet URL');
+  //     return;
+  //   }
+
+  //   setLoading(true);
+  //   setError('');
+
+  //   try {
+  //     const tweetId = extractTweetId(tweetUrl);
+
+  //     if (!tweetId) {
+  //       setError('Invalid tweet URL. Please use format: https://x.com/username/status/1234567890');
+  //       setLoading(false);
+  //       return;
+  //     }
+
+  //     // Call backend API
+  //     const response = await fetch('http://localhost:3001/api/tweet/preview', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ url: tweetUrl }),
+  //     });
+
+  //     if (!response.ok) {
+  //       throw new Error('Failed to fetch tweet');
+  //     }
+
+  //     const data = await response.json();
+
+  //     if (data.error) {
+  //       setError(`Backend Error: ${data.error}`);
+  //       return;
+  //     }
+
+  //     if (!data.data) {
+  //       setError('No tweet data received');
+  //       return;
+  //     }
+
+  //     setPreview(data.data);
+  //   } catch (err) {
+  //     console.error('Frontend Error:', err);
+  //     setError(`Error: ${err.message}`);
+  //   }
+
+  //   setLoading(false);
+  // };
+
+  const pollMockupStatus = async (taskKey) => {
+    let tries = 0;
+    while (tries < 15) {
+      tries++;
+      const res = await fetch(`http://localhost:3001/api/mockup/status/${taskKey}`);
+      const data = await res.json();
+
+      if (data.status === 'completed') {
+        console.log('✅ Mockup ready:', data.mockups[0].url);
+        setMockupImage(data.mockups[0].url);
+        return;
+      }
+      if (data.status === 'failed') {
+        setError('Mockup generation failed.');
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, 3000)); // wait 3s before retry
+    }
+
+    setError('Timeout: Mockup took too long to generate.');
+  };
+
+
   const handleGeneratePreview = async () => {
     if (!tweetUrl.trim()) {
       setError('Please enter a tweet URL');
@@ -147,50 +226,57 @@ export default function App() {
 
     setLoading(true);
     setError('');
+    setMockupImage(null);
 
     try {
       const tweetId = extractTweetId(tweetUrl);
-
       if (!tweetId) {
-        setError('Invalid tweet URL. Please use format: https://x.com/username/status/1234567890');
+        setError('Invalid tweet URL');
         setLoading(false);
         return;
       }
 
-      // Call backend API
-      const response = await fetch('http://localhost:3001/api/tweet/preview', {
+      // Step 1️⃣ - Fetch tweet data
+      const tweetRes = await fetch('http://localhost:3001/api/tweet/preview', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: tweetUrl }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch tweet');
+      const tweetData = await tweetRes.json();
+      if (!tweetData.success) throw new Error('Failed to fetch tweet data');
+
+      // Step 2️⃣ - Generate mockup via backend
+      const mockupRes = await fetch('http://localhost:3001/api/printful/mockup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tweetData: tweetData.data }),
+      });
+
+      const mockupData = await mockupRes.json();
+      console.log('🖼️ Mockup Data:', mockupData);
+
+      // ✅ If backend already polled and returned URLs:
+      if (mockupData.success && mockupData.mockup_urls?.length) {
+        setMockupImage(mockupData.mockup_urls[0]);   // Preview
+        setPrintFile(mockupData.image_uploaded);     // High-res print file
+      } 
+      // ⚙️ If backend only started a task (polling fallback)
+      else if (mockupData.mockup_task) {
+        await pollMockupStatus(mockupData.mockup_task);
       }
 
-      const data = await response.json();
+      setPreview(tweetData.data);
 
-      if (data.error) {
-        setError(`Backend Error: ${data.error}`);
-        return;
-      }
-
-      if (!data.data) {
-        setError('No tweet data received');
-        return;
-      }
-
-      setPreview(data.data);
     } catch (err) {
-      console.error('Frontend Error:', err);
-      setError(`Error: ${err.message}`);
+      console.error('❌ Error generating mockup:', err);
+      setError(err.message);
     }
 
     setLoading(false);
   };
 
+  
   const handleExportImage = () => {
     if (fabricRef.current) {
       const dataURL = fabricRef.current.toDataURL({
@@ -282,7 +368,7 @@ export default function App() {
             )}
           </div>
 
-          {/* Center: T-Shirt Canvas with Print */}
+          {/* Center: T-Shirt Canvas with Print 
           {preview && fabricLoaded && (
             <div className="lg:col-span-1 flex flex-col items-center justify-center">
               <h2 className="text-xl font-bold text-gray-900 mb-6 w-full text-center">T-Shirt Preview</h2>
@@ -311,7 +397,51 @@ export default function App() {
                 <p className="text-xs text-gray-500 mt-1">📌 Drag & position text on shirt</p>
               </div>
             </div>
+          )} */}
+
+          {mockupImage ? (
+            <div className="text-center mt-6">
+              <h2 className="font-bold mb-2">🖼️ Generated Mockup Preview</h2>
+              <img
+                src={mockupImage}
+                alt="Final T-shirt mockup"
+                className="rounded-lg shadow-2xl mx-auto border-2 border-gray-300"
+                style={{ maxWidth: '400px' }}
+              />
+              <p className="text-gray-500 text-sm mt-2">This is the real Printful mockup</p>
+              
+              {/* Download Buttons */}
+              <div className="flex gap-3 justify-center mt-4">
+                <a
+                  href={mockupImage}
+                  download={`mockup-preview-${Date.now()}.jpg`}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+                >
+                  <Download size={18} />
+                  Download Preview
+                </a>
+                
+                {preview?.uploadedImage && (
+                  <a
+                    href={preview.uploadedImage}
+                    download={`print-file-${Date.now()}.png`}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition"
+                  >
+                    <Download size={18} />
+                    Download Print File
+                  </a>
+                )}
+              </div>
+            </div>
+          ) : (
+            preview?.uploadedImage && (
+              <div className="text-center mt-6">
+                <h2 className="font-bold mb-2">Tweet Design Uploaded</h2>
+                <img src={preview.uploadedImage} alt="Tweet art" className="rounded-lg shadow-lg mx-auto" />
+              </div>
+            )
           )}
+
 
           {/* Right: Customizer */}
           {preview && (
